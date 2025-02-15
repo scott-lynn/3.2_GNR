@@ -9,6 +9,7 @@ Simulates AGNR using the TB formulation.
 # Imports
 ##########################################
 import numpy as np 
+import matplotlib.pyplot as plt
 
 ##########################################
 # Functions
@@ -69,84 +70,63 @@ def generate_hamiltonian(N, k, a, t1, epsilon_list):
     # Fill diagonal elements with on-site energies
     np.fill_diagonal(H, epsilon_list)
 
-    # Bottom Row
+    # Count 0 -> N-1 and generate Hamiltonian
     for i in range(0, N, 1):
+
+        # Assign atom index
+        bottom_atom = i
+        top_atom = N + i
+
         # LHS edge (Start on closed dimer line)
         if i == 0:
-            # intra
-            H[i, i+1] = -t1 
-            H[i, i+N] = -t1
+            # bottom row
+            H[bottom_atom, bottom_atom + 1] = -t1     
+            H[bottom_atom, bottom_atom + N] = -t1     
+            # top row
+            H[top_atom, top_atom + 1] = -t1           
+            H[top_atom, top_atom - N] = -t1          
 
         # RHS edge 
         elif i == N-1:
             # Closed dimer line (even index)
             if is_even(i):
-                #intra
-                H[i, i - 1] = -t1 
-                H[i, i + N] = -t1
+                # bottom row
+                H[bottom_atom, bottom_atom - 1] = -t1 
+                H[bottom_atom, bottom_atom + N] = -t1
+                # top row
+                H[top_atom, top_atom - 1] = -t1 
+                H[top_atom, top_atom - N] = -t1
+                
             # Open dimer line (odd index)
-            if is_odd(i):
-                # intra
-                H[i, i-1] = -t1
-                # inter
-                H[i, i+N] = -t1 * phase 
+            elif is_odd(i):
+                # bottom row
+                H[bottom_atom, bottom_atom - 1] = -t1             
+                H[bottom_atom, bottom_atom + N] = -t1 * phase     
+                # top row
+                H[top_atom, top_atom-1] = -t1
+                H[top_atom, top_atom-N] = -t1 * np.conj(phase)
 
         # Even index cases
         elif is_even(i): 
-            # intra
-            H[i, i-1] = -t1 
-            H[i, i+1] = -t1 
-            H[i, i+N] = -t1 
+            # bottom row
+            H[bottom_atom, bottom_atom - 1] = -t1 
+            H[bottom_atom, bottom_atom + 1] = -t1 
+            H[bottom_atom, bottom_atom + N] = -t1 
+            # top row
+            H[top_atom, top_atom - 1] = -t1 
+            H[top_atom, top_atom + 1] = -t1 
+            H[top_atom, top_atom - N] = -t1 
 
         # Odd index cases
         elif is_odd(i):
-            # intra
-            H[i, i-1] = -t1 
-            H[i, i+1] = -t1 
-            # inter
-            H[i, i+N] = -t1 * phase
-
-        # Catch wrong input
-        else:
-            print('generate_hamiltonian : atom indice error')
-
-    # Top Row
-    for i in range(0, N, 1):
-        atom_i = N + i
-        # LHS edge (closed dimer line)
-        if i == 0:
-            # intra
-            H[atom_i, atom_i+1] = -t1 
-            H[atom_i, atom_i-N] = -t1 
-
-        # RHS edge
-        elif i == N - 1: 
-            # Closed dimer line (even index)
-            if is_even(i):
-                # intra
-                H[atom_i, atom_i - 1] = -t1 
-                H[atom_i, atom_i - N] = -t1
-            # Open dimer line (odd index)
-            if is_odd(i):
-                # intra
-                H[atom_i, atom_i-1] = -t1
-                # inter
-                H[atom_i, atom_i-N] = -t1 * np.conj(phase)
-            
-        # Even index cases (closed dimer line)
-        elif is_even(i): 
-            # intra
-            H[atom_i, atom_i-1] = -t1 
-            H[atom_i, atom_i+1] = -t1 
-            H[atom_i, atom_i-N] = -t1 
-
-        # Odd index cases (open dimer line)
-        elif is_odd(i):
-            # intra
-            H[atom_i, atom_i-1] = -t1 
-            H[atom_i, atom_i+1] = -t1 
-            # inter
-            H[atom_i, atom_i-N] = -t1 * np.conj(phase)
+            # bottom row
+            H[bottom_atom, bottom_atom - 1] = -t1 
+            H[bottom_atom, bottom_atom + 1] = -t1 
+            H[bottom_atom, bottom_atom + N] = -t1 * phase
+            # top row
+            H[top_atom, top_atom - 1] = -t1 
+            H[top_atom, top_atom + 1] = -t1 
+            H[top_atom, top_atom - N] = -t1 * np.conj(phase)
 
         # Catch wrong input
         else:
@@ -247,19 +227,36 @@ def test_hamiltonian(type, print_matrix=None):
         else:
             print('Test result : Hamiltonian matrices do not match for odd N')
 
-# def eigensolver(H, N, a, t1, k, epsilon_list):
+def eigensolver(N, k_vals, a, t1, epsilon_list):
+    
+    k_len = len(k_vals)
+    eigenvalues = np.zeros((2*N, k_len))
 
-#     eigenvalues = np.empty(N, len(k))
+    # Loop through k values and solve for the energy eigenvalues
+    for i, k in enumerate(k_vals): 
+        # Create Hamiltonian for the current k
+        H = generate_hamiltonian(N, k, a, t1, epsilon_list)
 
-#     # Loop through k values and solve for the energty eigenvalues
-#     for kn in k: 
-#         # Create hamiltonian for given k
-#         generate_hamiltonian(N, kn, a, t1, epsilon_list)
+        # Solve for eigenvalues
+        eigenvalues[:, i] = np.linalg.eigvalsh(H)
 
-#         # Call eigensolver routine
-#         eigenvalues[kn, :] = np.linalg.eigenvalsh(H)
+    return eigenvalues
 
-#     return eigenvalues 
+def plot_bands(k_vals, E_bands):
+
+    plt.figure(dpi=200)
+
+    for band in E_bands:
+        plt.plot(k_vals, band, color='black')
+
+    plt.title('Band Structure of 14-AGNR: TB NN-Hopping ')
+    plt.xlabel('k (1/a)')
+    plt.ylabel('E (eV)')
+    #plt.ylim(-3, 3)
+    plt.xlim(0, np.pi)
+    plt.grid(True, which='both', axis='both', linewidth=0.5)
+    plt.show()
+
 ##########################################
 # Main Execution Block
 ##########################################
@@ -269,20 +266,23 @@ def main():
     N: int = 2
     a: float = 1 
     t1: float = 2.7 # eV
-    epsilon_list = [1.0, 1.0] # eV
+    epsilon_list = [0.0] # eV
 
     # Set k-space range
-    k_start: float = -np.pi/a 
+    k_start: float = 0
     k_end: float = np.pi/a
     k_points: int = 200 
     k = np.linspace(k_start, k_end, k_points)
 
-    # generate_hamiltonian(N, k, a, t1, epsilon_list)
-
     # Test for odd and even N cases
-    test_hamiltonian('odd', print_matrix=True)
+    test_hamiltonian('odd')
     test_hamiltonian('even', print_matrix=True)
 
-# Execute program
-main()
+    E_bands = eigensolver(N, k, a, t1, epsilon_list)
+    plot_bands(k, E_bands)
+
+# Execute program (professionally)
+
+if __name__=="__main__":
+    main()
     
